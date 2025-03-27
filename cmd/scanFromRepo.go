@@ -37,10 +37,24 @@ to quickly create a Cobra application.`,
 			os.Exit(1)
 		}
 
-		c, err := repository.ExtractChart(repo, chart)
-		fmt.Println(c)
+		c, err := repository.DownloadChart(repo, chart)
+		if err != nil {
+			fmt.Println("Error in downloading chart...")
+			os.Exit(1)
+		}
 
+		resp, err := repository.FindImages(c)
+		if err != nil {
+			fmt.Println("Error in finding images...")
+			os.Exit(1)
+		}
 
+		for i, img := range resp {
+			fmt.Printf("%d. Image scanned:\n", i+1)
+			fmt.Printf("   Image:  %s\n", img.Name)
+			fmt.Printf("   Size:   %s\n", img.Size)
+			fmt.Printf("   Layers: %d\n\n", img.Layers)
+		}			
 	},
 }
 

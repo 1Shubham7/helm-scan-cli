@@ -23,6 +23,8 @@ type ImageInfo struct {
 	Layers int    `json:"layers"`
 }
 
+var failed = "Failed to fetch"
+
 func FindImages(extractedChartPath string) ([]ImageInfo, error) {
 	patterns := []*regexp.Regexp{
 		// Matches: image: "nginx:1.21"  OR  image: postgres:13
@@ -114,7 +116,6 @@ func normalizeImage(rawImage string) ImageInfo {
 	}
 }
 
-
 func getSizeAndLayers(imageWithTag string) (size string, layers int, err error) {
 	ctx := context.Background()
 	// my Docker daemon supports 1.47 at most, and client was of latest 1.48 version.
@@ -123,7 +124,7 @@ func getSizeAndLayers(imageWithTag string) (size string, layers int, err error) 
 	// this give client highest API version that both the client and daemon support.
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to create Docker client: %w", err)
+		return failed, -1, fmt.Errorf("failed to create Docker client: %w", err)
 	}
 	defer cli.Close()
 
@@ -131,7 +132,7 @@ func getSizeAndLayers(imageWithTag string) (size string, layers int, err error) 
 	createReader, err := cli.ImageCreate(ctx, imageWithTag, imageCreateOptions)
 	if err != nil {
 		fmt.Println("one", err)
-		return 0, 0, fmt.Errorf("failed to create image %s: %w", imageWithTag, err)
+		return failed, -1, fmt.Errorf("failed to create image %s: %w", imageWithTag, err)
 	}
 	// Ensure we read and close the reader
 	if createReader != nil {
@@ -142,13 +143,21 @@ func getSizeAndLayers(imageWithTag string) (size string, layers int, err error) 
 	// Now inspect the image to get size and layers
 	inspect, err := cli.ImageInspect(ctx, imageWithTag)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to inspect image %s: %w", imageWithTag, err)
+		return failed, -1, fmt.Errorf("failed to inspect image %s: %w", imageWithTag, err)
 	}
 
-	size = inspect.Size
+	sizeInBytes := inspect.Size
+
+	// Format size based on the condition
+	if sizeInBytes > 1024*1024 { // More than 1 MB
+		size = fmt.Sprintf("%.2f MB", float64(sizeInBytes)/(1024*1024))
+	} else {
+		size = fmt.Sprintf("%d bytes", sizeInBytes)
+	}
+
 	layers = len(inspect.RootFS.Layers)
 
-	fmt.Printf("Image %s - Layers: %d, Size: %d bytes\n", imageWithTag, layers, size)
+	fmt.Printf("Image %s - Layers: %d, Size: %s\n", imageWithTag, layers, size)
 
 	// Delete the image after usage
 	_, err = cli.ImageRemove(ctx, imageWithTag, image.RemoveOptions{

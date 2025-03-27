@@ -9,7 +9,7 @@ import (
 	"helm.sh/helm/v3/pkg/getter"
 )
 
-func ExtractChart(repo, chart string) (chartPath string, err error) {
+func DownloadChart(repo, chart string) (chartPath string, err error) {
 	// Create a temporary directory for the chart
 	tempDir, err := os.MkdirTemp("", "helm-chart-*")
 	if err != nil {
